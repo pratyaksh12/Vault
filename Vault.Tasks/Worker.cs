@@ -1,5 +1,6 @@
 using Vault.Index.IServices;
 using Vault.Models;
+using UglyToad.PdfPig;
 
 namespace Vault.Tasks;
 
@@ -49,8 +50,7 @@ public class Worker : BackgroundService
             await WaitForFileAccess(filePath);
 
             // read content
-            var content = await File.ReadAllTextAsync(filePath);
-            var FileInfo = new FileInfo(filePath);
+            var content = GetFileContent(filePath);
 
             var doc = new Document
             {
@@ -69,6 +69,27 @@ public class Worker : BackgroundService
         catch(Exception ex)
         {
             _logger.LogError(ex, "Failed to process file aT: " + filePath);
+        }
+    }
+
+    private string GetFileContent(string filePath)
+    {
+        try
+        {
+            string extension = Path.GetExtension(filePath).ToLower();
+            if(extension == ".pdf")
+            {
+                using var pdf = PdfDocument.Open(filePath);
+                return string.Join(" ", pdf.GetPages().Select(p => p.Text));
+            }
+            else
+            {
+                return File.ReadAllText(filePath);
+            }
+        }catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error Reading the file");
+            return string.Empty;
         }
     }
 
