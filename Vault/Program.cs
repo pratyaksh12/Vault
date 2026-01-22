@@ -8,6 +8,23 @@ using Vault.Index.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// [NEW] Enable CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy.AllowAnyOrigin() // [FIX] simpler for dev
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<VaultContext>(Options =>
 {
@@ -22,10 +39,15 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseSwagger();
+    app.UseSwaggerUI();
     app.MapOpenApi();
 }
 
+app.UseCors("AllowFrontend"); 
+
 app.UseHttpsRedirection();
+app.MapControllers();
 
 app.Run();
 
