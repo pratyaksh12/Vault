@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Transport;
+using Vault.Core.Models;
 using Vault.Index.IServices;
 using Vault.Models;
 
@@ -67,26 +72,42 @@ public class ElasticSearchService : IElasticSearchService
         }
     }
 
-    public async Task<IEnumerable<Document>> SearchDocumentAsync(string query)
+    public async Task<IEnumerable<SearchResult>> SearchDocumentAsync(string query)
     {
         var response = await _client.SearchAsync<Document>(s => s
-        .Index(IndexName)
-        .Query(q => q
-            .MultiMatch(m => m
-                .Fields(Infer.Fields<Document>(p => p.Content, p => p.Path))
-                .Query(query)
-                .Fuzziness(new Fuzziness("AUTO"))
+            .Index(IndexName)
+            .Query(q => q
+                .MultiMatch(m => m
+                    .Fields(Infer.Fields<Document>(p => p.Content, p => p.Path))
+                    .Query(query)
+                    .Fuzziness(new Fuzziness("AUTO"))
+                )
             )
-        )
+            .Highlight(h => h
+                .Fields(f => f
+                    .Add(Infer.Field<Document>(p => p.Content), new HighlightField
+                    {
+                        PreTags = new[] { "<em>" },
+                        PostTags = new[] { "</em>" },
+                        FragmentSize = 300
+                    })
+                )
+            )
         );
-
 
         if (!response.IsValidResponse)
         {
-            return new List<Document>();
-            
+            return new List<SearchResult>();
         }
 
-        return response.Documents;
+        return response.Hits.Select(hit => new SearchResult
+        {
+            Id = hit.Source?.Id ?? "",
+            Path = hit.Source?.Path ?? "",
+            Snippet = hit.Highlight != null && hit.Highlight.ContainsKey("content") 
+                ? string.Join(" ... ", hit.Highlight["content"]) 
+                : (hit.Source?.Content.Length > 300 ? hit.Source.Content.Substring(0, 300) + "..." : hit.Source?.Content ?? "")
+        });
     }
+
 }

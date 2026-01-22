@@ -3,11 +3,11 @@
 import { useState } from "react";
 import axios from "axios";
 
-// Define the Document Interface
+// Define the Document Interface matching the Backend SearchResult
 interface DocumentResult {
   id: string;
   path: string;
-  content: string;
+  snippet: string; // Using snippet from SearchResult
 }
 
 export default function Home() {
@@ -80,7 +80,8 @@ export default function Home() {
             results.map((doc) => (
               <div
                 key={doc.id}
-                className="bg-neutral-800 border border-neutral-700 p-6 rounded-xl hover:border-neutral-500 transition-colors"
+                onClick={() => window.open(`http://localhost:5123/api/documents/${doc.id}/download`, '_blank')}
+                className="bg-neutral-800 border border-neutral-700 p-6 rounded-xl hover:border-blue-500 cursor-pointer transition-all active:scale-[0.99]"
               >
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-mono text-neutral-500 truncate flex-1 min-w-0 mr-4" title={doc.path}>
@@ -91,11 +92,11 @@ export default function Home() {
                     </span>
                 </div>
                 
-                {/* Content Snippet (Truncated) */}
-                <p className="text-neutral-300 leading-relaxed break-all">
-                  {doc.content.substring(0, 300)}
-                  {doc.content.length > 300 && "..."}
-                </p>
+                {/* Content Snippet (Rendered HTML for Highlights) */}
+                <p 
+                    className="text-neutral-300 leading-relaxed break-all"
+                    dangerouslySetInnerHTML={{ __html: doc.snippet }}
+                />
               </div>
             ))
           ) : (

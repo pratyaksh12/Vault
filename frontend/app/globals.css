@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@layer base {
+  em {
+    @apply bg-yellow-400 text-black not-italic px-1 rounded font-semibold;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
