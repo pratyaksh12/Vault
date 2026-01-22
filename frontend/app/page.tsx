@@ -7,7 +7,8 @@ import axios from "axios";
 interface DocumentResult {
   id: string;
   path: string;
-  snippet: string; // Using snippet from SearchResult
+  snippet: string;
+  pageNumber: number; // Added Page Number
 }
 
 export default function Home() {
@@ -80,13 +81,19 @@ export default function Home() {
             results.map((doc) => (
               <div
                 key={doc.id}
-                onClick={() => window.open(`http://localhost:5123/api/documents/${doc.id}/download`, '_blank')}
+                onClick={() => window.open(`http://localhost:5123/api/documents/${doc.id}/download#page=${doc.pageNumber}`, '_blank')}
                 className="bg-neutral-800 border border-neutral-700 p-6 rounded-xl hover:border-blue-500 cursor-pointer transition-all active:scale-[0.99]"
               >
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-mono text-neutral-500 truncate flex-1 min-w-0 mr-4" title={doc.path}>
                         {doc.path}
                     </span>
+                    
+                    {/* Page Badge */}
+                    <span className="text-xs bg-blue-900/50 text-blue-200 px-2 py-1 rounded mr-2 shrink-0">
+                        Page {doc.pageNumber}
+                    </span>
+
                     <span className="text-xs bg-neutral-700 px-2 py-1 rounded text-neutral-300 shrink-0">
                         Match
                     </span>

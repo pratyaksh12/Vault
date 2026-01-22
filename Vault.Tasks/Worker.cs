@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 using Vault.Interfaces;
 using System.Threading.Tasks;
 using System.IO.Compression;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace Vault.Tasks;
 
@@ -77,8 +78,8 @@ public class Worker : BackgroundService
                 var documents = new List<Document>();
                 foreach (var item in files)
                 {
-                    var doc = CreateDocumentFromFile(item);
-                    if(doc is not null) documents.Add(doc);
+                    var docs = CreateDocumentsFromFile(item);
+                    if(docs is not null && docs.Any()) documents.AddRange(docs);
                 }
 
                 if (documents.Count != 0)
@@ -106,26 +107,69 @@ public class Worker : BackgroundService
         }
     }
 
-    private Document? CreateDocumentFromFile(string filePath)
+    private List<Document> CreateDocumentsFromFile(string filePath)
     {
-        var content = GetFileContent(filePath);
-        if(string.IsNullOrWhiteSpace(content)) return null;
+        var list = new List<Document>();
 
-        var fileInfo = new FileInfo(filePath);
-
-        return new Document
+        try
         {
-            Id = Guid.NewGuid().ToString(),
-            Path = filePath,
-            Content = content,
-            ProjectId = "defaut",
-            Status = 1, 
-            ContentType = fileInfo.Extension,
-            ContentLength = fileInfo.Length,
-            ExtractionDate = DateTime.UtcNow,
-            Metadata = "{}", 
-            ParentId = Guid.Empty.ToString() 
-        };
+            var fileInfo = new FileInfo(filePath);
+            string extension = Path.GetExtension(filePath).ToLower();
+
+            if(extension == ".pdf")
+            {
+                using var pdf = PdfDocument.Open(filePath);
+                foreach (var item in pdf.GetPages())
+                {
+                    var text = ContentOrderTextExtractor.GetText(item);
+
+                    if(string.IsNullOrWhiteSpace(text)) continue;
+
+                    list.Add(new Document
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Path = filePath,
+                        Content = text,
+                        ProjectId = "default",
+                        Status = 1,
+                        ContentType = extension,
+                        ContentLength = text.Length,
+                        ExtractionDate = DateTime.UtcNow,
+                        Metadata = "{}",
+                        ParentId = Guid.Empty.ToString(),
+                        PageNumber = item.Number 
+                    });
+                }
+            }
+            else
+            {
+                //handling Text/Other
+                var content = File.ReadAllText(filePath);
+                if (!string.IsNullOrWhiteSpace(filePath))
+                {
+                    list.Add(new Document
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Path = filePath,
+                        Content = content,
+                        ProjectId = "default",
+                        Status = 1,
+                        ContentType = extension,
+                        ContentLength = content.Length,
+                        ExtractionDate = DateTime.UtcNow,
+                        Metadata = "{}",
+                        ParentId = Guid.Empty.ToString(),
+                        PageNumber = 1
+                    });
+                }
+            }
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error Processing File" + filePath);
+        }
+
+        return list;
     }
 
     private void OnError(object sender, ErrorEventArgs e)
@@ -139,23 +183,21 @@ public class Worker : BackgroundService
             await WaitForFileAccess(filePath);
 
             // read content
-            var doc = CreateDocumentFromFile(filePath);
+            var docs = CreateDocumentsFromFile(filePath);
 
-            if(doc is null) return;
-
-            var fileInfo = new FileInfo(filePath);
+            if(docs is null || docs.Count == 0) return;
 
             //Send it to elasticsearch
             using (var scope = _scopeFactory.CreateScope()){
                 var repository = scope.ServiceProvider.GetRequiredService<IVaultRepository<Document>>();
 
-                await repository.AddAsync(doc);
+                await repository.AddRangeAsync(docs);
                 await repository.SaveChangesAsync();
-                _logger.LogInformation("Saved to DB: {Id}: "+ doc.Id);
+                _logger.LogInformation("Saved docs to DB. Total count: "+ docs.Count);
             }
 
-            await _elasticService.IndexDocumentAsync(doc);
-            _logger.LogInformation("Indexing of the file completed; {Id}: " + doc.Id);
+            await _elasticService.BulkIndexAsync(docs);
+            _logger.LogInformation("Indexing of the file completed; {Id}: " + docs.Count);
 
         }
         catch(Exception ex)

@@ -19,6 +19,10 @@ public class Document
     [MaxLength(96)]
     public string ProjectId{get;set;} = null!;
 
+    [Column("page_number")]
+    [MaxLength(10000)]
+    public int PageNumber{get; set;} = 1;
+
     [Column("content")]
     public string Content{get; set;} = null!;
 
