@@ -63,7 +63,30 @@ public class ElasticSearchService : IElasticSearchService
         var response = await _client.IndexAsync(document);
         if (!response.IsValidResponse)
         {
-            throw new Exception("Failed to index the document: {" + response.DebugInformation +"}");
+            throw new Exception("Failed to index the document: {" + response.DebugInformation + "}");
         }
+    }
+
+    public async Task<IEnumerable<Document>> SearchDocumentAsync(string query)
+    {
+        var response = await _client.SearchAsync<Document>(s => s
+        .Index(IndexName)
+        .Query(q => q
+            .MultiMatch(m => m
+                .Fields(Infer.Fields<Document>(p => p.Content, p => p.Path))
+                .Query(query)
+                .Fuzziness(new Fuzziness("AUTO"))
+            )
+        )
+        );
+
+
+        if (!response.IsValidResponse)
+        {
+            return new List<Document>();
+            
+        }
+
+        return response.Documents;
     }
 }

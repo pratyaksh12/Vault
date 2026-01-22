@@ -7,4 +7,5 @@ public interface IElasticSearchService
     Task CreateIndexAsync();
     Task IndexDocumentAsync(Document document);
     Task BulkIndexAsync(IEnumerable<Document> documents);
+    Task<IEnumerable<Document>> SearchDocumentAsync(string query);
 }
