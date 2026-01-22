@@ -101,7 +101,7 @@ public class Worker : BackgroundService
             if(extension == ".pdf")
             {
                 using var pdf = PdfDocument.Open(filePath);
-                return string.Join(" ", pdf.GetPages().Select(p => p.Text));
+                return string.Join(" ", pdf.GetPages().Select(p => UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor.ContentOrderTextExtractor.GetText(p)));
             }
             else
             {
