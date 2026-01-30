@@ -22,16 +22,18 @@ public class Worker : BackgroundService
     private readonly IElasticSearchService _elasticService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly TesseractEngine _ocrEngine;
+    private readonly NlpService _nlpService;
     private const string _uploadPath = "/tmp/vault_ingest";
     private readonly string _storagePath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) + "/Vault_files";
     private readonly string _tessDataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
 
 
-    public Worker(ILogger<Worker> logger, IElasticSearchService elasticService, IServiceScopeFactory scopeFactory)
+    public Worker(ILogger<Worker> logger, IElasticSearchService elasticService, IServiceScopeFactory scopeFactory, NlpService nlpService)
     {
         _logger = logger;
         _elasticService = elasticService;
         _scopeFactory = scopeFactory;
+        _nlpService = nlpService;
         
         // Initialize OCR Engine once (Singleton pattern for performance)
         _ocrEngine = new TesseractEngine(_tessDataPath, "eng", EngineMode.Default);
@@ -52,6 +54,7 @@ public class Worker : BackgroundService
         
         // Ensure Index exists with correct mappings
         await _elasticService.CreateIndexAsync();
+        await _nlpService.InitializeAsync();
 
         if(!File.Exists(Path.Combine(_tessDataPath, "eng.traineddata")))
         {
@@ -121,8 +124,12 @@ public class Worker : BackgroundService
                         _logger.LogInformation("Using PDF Text (Length: {Length}) for page {Page}", text.Length, page.Number);
                     }
 
-                    var entities = EntityExtractor.Extract(text);
-                    var metadatajson = JsonSerializer.Serialize(entities);
+                    
+                    var entities = _nlpService.ExtractEntities(text);
+                    var metadata = JsonSerializer.Serialize(entities);
+                    
+                    // [DEBUG LOGGING]
+                    _logger.LogInformation($"DEBUG: Metadata for {page.Number}: {metadata}");
 
                     docs.Add(new Document
                     {
@@ -134,7 +141,7 @@ public class Worker : BackgroundService
                         ContentType = ext,
                         ContentLength = text.Length,
                         ExtractionDate = DateTime.UtcNow,
-                        Metadata = metadatajson,
+                        Metadata = metadata,
                         ParentId = Guid.Empty.ToString(),
                         PageNumber = page.Number ,
                         Checksum = checksum
@@ -150,8 +157,9 @@ public class Worker : BackgroundService
             _logger.LogInformation("Processing image for OCR: {Path}", filePath);
             string text = PerformOcr(File.ReadAllBytes(filePath));
 
-            var entities = EntityExtractor.Extract(text);
-            var metadatajson = JsonSerializer.Serialize(entities);
+            var entities = _nlpService.ExtractEntities(text);
+            var metadata = JsonSerializer.Serialize(entities);
+
 
             docs.Add(new Document
             {
@@ -163,7 +171,7 @@ public class Worker : BackgroundService
                 ContentType = ext,
                 ContentLength = text.Length,
                 ExtractionDate = DateTime.UtcNow,
-                Metadata = metadatajson,
+                Metadata = metadata,
                 ParentId = Guid.Empty.ToString(),
                 PageNumber = docs.Count,
                 Checksum = checksum
@@ -172,8 +180,9 @@ public class Worker : BackgroundService
         {
             string text = File.ReadAllText(filePath);
 
-            var entities = EntityExtractor.Extract(text);
-            var metadatajson = JsonSerializer.Serialize(entities);
+            var entities = _nlpService.ExtractEntities(text);
+            var metadata = JsonSerializer.Serialize(entities);
+
 
             docs.Add(new Document
             {
@@ -185,7 +194,7 @@ public class Worker : BackgroundService
                 ContentType = ext,
                 ContentLength = text.Length,
                 ExtractionDate = DateTime.UtcNow,
-                Metadata = metadatajson,
+                Metadata = metadata,
                 ParentId = Guid.Empty.ToString(),
                 PageNumber = docs.Count,
                 Checksum = checksum
@@ -385,10 +394,10 @@ public class Worker : BackgroundService
         var hash = await sha256.ComputeHashAsync(stream, stoppingToken);
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
-     private string CalculateHash(string filePath)
-    {
-        return CalculateHashAsync(filePath, CancellationToken.None).GetAwaiter().GetResult();
-    }
+    //  private string CalculateHash(string filePath)
+    // {
+    //     return CalculateHashAsync(filePath, CancellationToken.None).GetAwaiter().GetResult();
+    // }
 
 
     private async Task WaitForFileAccess(string filePath, TimeSpan timeout, CancellationToken stoppingToken)

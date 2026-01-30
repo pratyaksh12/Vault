@@ -16,6 +16,7 @@ builder.Services.AddDbContext<VaultContext>(options =>
 
 
 builder.Services.AddScoped(typeof(IVaultRepository<>), typeof(VaultRepository<>));
+builder.Services.AddSingleton<NlpService>();
 
 
 var elasticUri = new Uri(builder.Configuration["ElasticSearch:Uri"] ?? "http://localhost:9200");

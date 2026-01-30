@@ -50,7 +50,34 @@ const EntityChips = ({ metadataJson }: { metadataJson: string }) => {
      if (data.dates && Array.isArray(data.dates)) {
       data.dates.forEach((date: string) => chips.push(
         <span key={date} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-purple-900/40 text-purple-200 border border-purple-800/50 mr-2 mb-1">
-          📅 {date}
+          {date}
+        </span>
+      ));
+    }
+
+    // Persons (Orange)
+    if (data.persons && Array.isArray(data.persons)) {
+      data.persons.forEach((p: string) => chips.push(
+        <span key={p} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-orange-900/40 text-orange-200 border border-orange-800/50 mr-2 mb-1">
+          {p}
+        </span>
+      ));
+    }
+
+    // Locations (Red)
+    if (data.locations && Array.isArray(data.locations)) {
+      data.locations.forEach((l: string) => chips.push(
+        <span key={l} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-red-900/40 text-red-200 border border-red-800/50 mr-2 mb-1">
+          {l}
+        </span>
+      ));
+    }
+
+    // Organizations (Gray)
+    if (data.organizations && Array.isArray(data.organizations)) {
+      data.organizations.forEach((o: string) => chips.push(
+        <span key={o} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-neutral-700/60 text-neutral-200 border border-neutral-600/50 mr-2 mb-1">
+          🏢 {o}
         </span>
       ));
     }
