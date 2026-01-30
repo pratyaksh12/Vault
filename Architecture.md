@@ -2,7 +2,7 @@
 
 This document outlines the architecture, data flow, and ingestion pipeline for the **Vault** project (formerly Datashare). The system is designed to ingest, process, OCR, and index documents (PDF, Images, Text) for full-text search and retrieval.
 
-## 🏗 High-Level Architecture
+## High-Level Architecture
 
 The system follows a micro-services or modular monolith approach, currently centered around a **Worker Service** for data ingestion.
 
@@ -22,16 +22,16 @@ graph TD
     Worker -->|Index Content| ES
 ```
 
-## 🧩 Components
+## Components
 
 | Component | Path | Responsibility | Keys Tech |
 | :--- | :--- | :--- | :--- |
-| **Vault.Tasks** | `Vault/Vault.Tasks` | Background worker that monitors files, orchestrates OCR, and handles ingestion. | .NET 9, Tesseract, PdfPig, ImageSharp |
+| **Vault.Tasks** | `Vault/Vault.Tasks` | Background worker that monitors files, orchestrates OCR, NLP, and handles ingestion. | .NET 9, Tesseract, PdfPig, Catalyst NLP |
 | **Vault.Core** | `Vault/Vault.Core` | Shared domain models and interfaces. | .NET Standard |
 | **Vault.Db** | `Vault/Vault.Db` | Database persistence layer (EF Core). | Npgsql, EF Core |
 | **Vault.Index** | `Vault/Vault.Index` | Search indexing services. | Elastic.Clients.Elasticsearch |
 
-## 🔄 Ingestion Pipeline
+## Ingestion Pipeline
 
 The ingestion pipeline is implemented in `Worker.cs` and triggers automatically when a file is dropped into the watch folder.
 
@@ -74,8 +74,16 @@ stateDiagram-v2
             [*] --> TesseractOCR
         }
     }
+    
+    Extraction --> NLP: Text Extracted
+    
+    state NLP {
+        [*] --> EntityRecognition
+        EntityRecognition --> Catalyst: Persons, Orgs, Locs
+        EntityRecognition --> Regex: Emails, Phones
+    }
 
-    Extraction --> Persist: Document Object(s) created
+    NLP --> Persist: Metadata Enriched
     
     state Persist {
         [*] --> SaveToPostgres
@@ -95,7 +103,7 @@ stateDiagram-v2
 3.  **Concurrency**: The worker processes files sequentially as they are detected by the `FileSystemWatcher`.
 4.  **Storage**: Processed files are moved from `/tmp/vault_ingest` to `~/Desktop/Vault_files`.
 
-## 💾 Data Model
+## Data Model
 
 The core entity is the `Document`.
 
@@ -119,7 +127,7 @@ classDiagram
 *   **Checksum**: SHA256 hash for deduplication.
 *   **PageNumber**: For PDFs, each page is stored as a separate `Document` entry, allowing granular search results.
 
-## 🛠 Technology Stack
+## Technology Stack
 
 *   **Framework**: .NET 9 (Worker Service)
 *   **Database**: PostgreSQL
@@ -127,5 +135,6 @@ classDiagram
 *   **Libraries**:
     *   `Tesseract` (OCR)
     *   `UglyToad.PdfPig` (PDF Parsing)
+    *   `Catalyst` (NLP / Entity Recognition)
     *   `SixLabors.ImageSharp` (Image Processing)
     *   `Microsoft.EntityFrameworkCore`
