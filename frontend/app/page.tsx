@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { JSX, useState } from "react";
 import axios from "axios";
 
 // Define the Document Interface matching the Backend SearchResult

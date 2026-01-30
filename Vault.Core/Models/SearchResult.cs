@@ -8,4 +8,5 @@ public class SearchResult
     public string Path{get; set;} = null!;
     public string Snippet {get; set;} = null!;
     public int PageNumber{get; set;}
+    public string Metadata {get; set;} = "{}";
 }
